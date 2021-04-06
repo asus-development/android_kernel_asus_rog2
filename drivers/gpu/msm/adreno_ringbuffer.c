@@ -327,7 +327,7 @@ int adreno_ringbuffer_probe(struct adreno_device *adreno_dev, bool nopreempt)
 
 	if (!adreno_is_a3xx(adreno_dev)) {
 		status = kgsl_allocate_global(device, &device->scratch,
-				PAGE_SIZE, 0, 0, "scratch");
+				PAGE_SIZE, 0, KGSL_MEMDESC_RANDOM, "scratch");
 		if (status != 0)
 			return status;
 	}
@@ -370,7 +370,6 @@ static void _adreno_ringbuffer_close(struct adreno_device *adreno_dev,
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 
 	kgsl_free_global(device, &rb->pagetable_desc);
-
 	kgsl_free_global(device, &rb->profile_desc);
 	kgsl_free_global(device, &rb->buffer_desc);
 	kgsl_del_event_group(&rb->events);
@@ -875,7 +874,7 @@ static inline int _get_alwayson_counter(struct adreno_device *adreno_dev,
 
 	return (unsigned int)(p - cmds);
 }
- 
+
 /* This is the maximum possible size for 64 bit targets */
 #define PROFILE_IB_DWORDS 4
 #define PROFILE_IB_SLOTS (PAGE_SIZE / (PROFILE_IB_DWORDS << 2))
