@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -320,7 +320,6 @@ int dsi_panel_pre_mode_switch_to_cmd(struct dsi_panel *panel);
 int dsi_panel_mode_switch_to_cmd(struct dsi_panel *panel);
 
 int dsi_panel_mode_switch_to_vid(struct dsi_panel *panel);
-
 int dsi_panel_switch(struct dsi_panel *panel);
 
 int dsi_panel_post_switch(struct dsi_panel *panel);
@@ -336,6 +335,9 @@ struct dsi_panel *dsi_panel_ext_bridge_get(struct device *parent,
 int dsi_panel_parse_esd_reg_read_configs(struct dsi_panel *panel);
 
 void dsi_panel_ext_bridge_put(struct dsi_panel *panel);
+
+void dsi_panel_calc_dsi_transfer_time(struct dsi_host_common_cfg *config,
+		struct dsi_display_mode *mode, u32 frame_threshold_us);
 
 /* ASUS BSP Display +++ */
 int dsi_panel_asusFps(struct dsi_panel *panel, int type);
