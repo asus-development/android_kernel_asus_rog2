@@ -66,8 +66,8 @@
 };
 
 &qupv3_se13_4uart {
-   interrupts-extended = <&pdc GIC_SPI 585 0>,
-   <&tlmm 46 0>;
+   //interrupts-extended = <&pdc GIC_SPI 585 0>,
+   //<&tlmm 46 0>;
 	status = "ok";
 };
 
