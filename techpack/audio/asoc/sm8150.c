@@ -68,7 +68,8 @@
 #define WCN_CDC_SLIM_RX_CH_MAX 2
 #define WCN_CDC_SLIM_TX_CH_MAX 3
 
-#define ADSP_STATE_READY_TIMEOUT_MS 3000
+//#define ADSP_STATE_READY_TIMEOUT_MS 3000
+#define ADSP_STATE_READY_TIMEOUT_MS 6000  /* Rice */
 #define MSM_LL_QOS_VALUE 300 /* time in us to ensure LPM doesn't go in C3/C4 */
 #define MSM_HIFI_ON 1
 
@@ -173,6 +174,7 @@ struct msm_asoc_mach_data {
 	struct device_node *us_euro_gpio_p; /* used by pinctrl API */
 	struct device_node *hph_en1_gpio_p; /* used by pinctrl API */
 	struct device_node *hph_en0_gpio_p; /* used by pinctrl API */
+	struct device_node *quat_mi2s_gpio_p; /* ASUS_BSP Paul +++ */
 	struct device_node *fsa_handle;
 	struct snd_soc_codec *codec;
 	struct work_struct adsp_power_up_work;
@@ -458,7 +460,7 @@ static struct dev_config mi2s_rx_cfg[] = {
 	[PRIM_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	[SEC_MI2S]  = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
-	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
+	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S24_LE, 2}, /* ASUS_BSP Paul +++ */
 	[QUIN_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 };
 
@@ -466,7 +468,7 @@ static struct dev_config mi2s_tx_cfg[] = {
 	[PRIM_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
 	[SEC_MI2S]  = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
 	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
-	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
+	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S24_LE, 2}, /* ASUS_BSP Paul +++ */
 	[QUIN_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
 };
 
@@ -3379,6 +3381,11 @@ static const struct snd_soc_dapm_widget msm_dapm_widgets_tavil[] = {
 	SND_SOC_DAPM_SPK("hifi amp", msm_hifi_ctrl_event),
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	/* ASUS_BSP Paul +++ */
+	SND_SOC_DAPM_MIC("Second Mic", NULL),
+	SND_SOC_DAPM_MIC("Third Mic", NULL),
+	SND_SOC_DAPM_MIC("Fourth Mic", NULL),
+	/* ASUS_BSP Paul --- */
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("Analog Mic5", NULL),
@@ -4146,6 +4153,11 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	snd_soc_dapm_ignore_suspend(dapm, "Handset Mic");
+	/* ASUS_BSP Paul +++ */
+	snd_soc_dapm_ignore_suspend(dapm, "Second Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Third Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Fourth Mic");
+	/* ASUS_BSP Paul +++ */
 	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic0");
 	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic1");
 	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic2");
@@ -4295,7 +4307,7 @@ static void *def_wcd_mbhc_cal(void)
 		return NULL;
 
 #define S(X, Y) ((WCD_MBHC_CAL_PLUG_TYPE_PTR(wcd_mbhc_cal)->X) = (Y))
-	S(v_hs_max, 1600);
+	S(v_hs_max, 1700); /* ASUS_BSP Paul +++ */
 #undef S
 #define S(X, Y) ((WCD_MBHC_CAL_BTN_DET_PTR(wcd_mbhc_cal)->X) = (Y))
 	S(num_btn, WCD_MBHC_DEF_BUTTONS);
@@ -4305,11 +4317,11 @@ static void *def_wcd_mbhc_cal(void)
 	btn_high = ((void *)&btn_cfg->_v_btn_low) +
 		(sizeof(btn_cfg->_v_btn_low[0]) * btn_cfg->num_btn);
 
-	btn_high[0] = 75;
-	btn_high[1] = 150;
-	btn_high[2] = 237;
-	btn_high[3] = 500;
-	btn_high[4] = 500;
+	btn_high[0] = 75;  //Austin+++
+	btn_high[1] = 125;
+	btn_high[2] = 225;
+	btn_high[3] = 438;
+	btn_high[4] = 438; //Austin---
 	btn_high[5] = 500;
 	btn_high[6] = 500;
 	btn_high[7] = 500;
@@ -5007,10 +5019,12 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 	unsigned int fmt = SND_SOC_DAIFMT_CBS_CFS;
 	struct snd_soc_card *card = rtd->card;
 	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+#if 0 /* ASUS_BSP Paul +++ */
 	struct msm_pinctrl_info *pinctrl_info = &pdata->pinctrl_info;
 	int ret_pinctrl = 0;
+#endif
 
-	dev_dbg(rtd->card->dev,
+	dev_err(rtd->card->dev,
 		"%s: substream = %s  stream = %d, dai name %s, dai ID %d\n",
 		__func__, substream->name, substream->stream,
 		cpu_dai->name, cpu_dai->id);
@@ -5049,11 +5063,17 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 			goto clk_off;
 		}
 		if (index == QUAT_MI2S) {
+#if 0
 			ret_pinctrl = msm_set_pinctrl(pinctrl_info,
 						      STATE_MI2S_ACTIVE);
 			if (ret_pinctrl)
 				pr_err("%s: MI2S TLMM pinctrl set failed with %d\n",
 					__func__, ret_pinctrl);
+#endif
+			/* ASUS_BSP Paul +++ */
+			if (pdata->quat_mi2s_gpio_p)
+				msm_cdc_pinctrl_select_active_state(pdata->quat_mi2s_gpio_p);
+			/* ASUS_BSP Paul --- */
 		}
 	}
 clk_off:
@@ -5074,10 +5094,12 @@ static void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 	int index = rtd->cpu_dai->id;
 	struct snd_soc_card *card = rtd->card;
 	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+#if 0 /* ASUS_BSP Paul +++ */
 	struct msm_pinctrl_info *pinctrl_info = &pdata->pinctrl_info;
 	int ret_pinctrl = 0;
+#endif
 
-	pr_debug("%s(): substream = %s  stream = %d\n", __func__,
+	pr_err("%s(): substream = %s  stream = %d\n", __func__,
 		 substream->name, substream->stream);
 	if (index < PRIM_MI2S || index >= MI2S_MAX) {
 		pr_err("%s:invalid MI2S DAI(%d)\n", __func__, index);
@@ -5091,11 +5113,17 @@ static void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 			pr_err("%s:clock disable failed for MI2S (%d); ret=%d\n",
 				__func__, index, ret);
 		if (index == QUAT_MI2S) {
+#if 0
 			ret_pinctrl = msm_set_pinctrl(pinctrl_info,
 						      STATE_DISABLE);
 			if (ret_pinctrl)
 				pr_err("%s: MI2S TLMM pinctrl set failed with %d\n",
 					__func__, ret_pinctrl);
+#endif
+			/* ASUS_BSP Paul +++ */
+			if (pdata->quat_mi2s_gpio_p)
+				msm_cdc_pinctrl_select_sleep_state(pdata->quat_mi2s_gpio_p);
+			/* ASUS_BSP Paul --- */
 		}
 	}
 	mutex_unlock(&mi2s_intf_conf[index].lock);
@@ -5685,6 +5713,22 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 			    SND_SOC_DPCM_TRIGGER_POST},
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 		.ignore_suspend = 1,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+	},
+	/* NXP amp */
+	{
+		.name = "Quaternary MI2S_TX Hostless Capture",
+		.stream_name = "Quaternary MI2S_TX Hostless Capture",
+		.cpu_dai_name = "QUAT_MI2S_TX_HOSTLESS",
+		.platform_name = "msm-pcm-hostless",
+		.dynamic = 1,
+		.dpcm_capture = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			 SND_SOC_DPCM_TRIGGER_POST},
+		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
 	},
@@ -6576,6 +6620,20 @@ static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	},
 };
 
+/* NXP amp */
+static struct snd_soc_dai_link_component tfa98xx_codecs[] = {
+	{
+		.name = "tfa98xx.4-0034",
+		.of_node = NULL,
+		.dai_name = "tfa98xx-aif-4-34",
+	},
+	{
+		.name = "tfa98xx.4-0035",
+		.of_node = NULL,
+		.dai_name = "tfa98xx-aif-4-35",
+	},
+};
+
 static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 	{
 		.name = LPASS_BE_PRI_MI2S_RX,
@@ -6669,8 +6727,10 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Quaternary MI2S Playback",
 		.cpu_dai_name = "msm-dai-q6-mi2s.3",
 		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-rx",
+		//.codec_name = "msm-stub-codec.1",
+		//.codec_dai_name = "msm-stub-rx",
+		.codecs = tfa98xx_codecs, /* NXP amp */
+		.num_codecs = 2, /* NXP amp */
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_QUATERNARY_MI2S_RX,
@@ -6684,8 +6744,10 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Quaternary MI2S Capture",
 		.cpu_dai_name = "msm-dai-q6-mi2s.3",
 		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-tx",
+		//.codec_name = "msm-stub-codec.1",
+		//.codec_dai_name = "msm-stub-tx",
+		.codecs = tfa98xx_codecs, /* NXP amp */
+		.num_codecs = 2, /* NXP amp */
 		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_QUATERNARY_MI2S_TX,
@@ -7676,6 +7738,16 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 				"qcom,hph-en0-gpio",
 				pdev->dev.of_node->full_name);
 		}
+
+		/* ASUS_BSP Paul +++ */
+		pdata->quat_mi2s_gpio_p = of_parse_phandle(pdev->dev.of_node,
+							"qcom,quat-mi2s-gpios", 0);
+		if (!pdata->quat_mi2s_gpio_p) {
+			dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
+				"qcom,quat-mi2s-gpios",
+				pdev->dev.of_node->full_name);
+		}
+		/* ASUS_BSP Paul --- */
 	}
 
 	ret = of_property_read_string(pdev->dev.of_node,

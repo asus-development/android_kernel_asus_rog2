@@ -51,6 +51,13 @@
 #include "../wcdcal-hwdep.h"
 #include "wcd934x-dsd.h"
 
+/* ASUS_BSP Paul +++ */
+#include <linux/proc_fs.h>
+#include <soc/internal.h>
+#define GPIO_AUDIO_DEBUG 59
+struct tavil_priv *g_tavil_priv;
+/* ASUS_BSP Paul --- */
+
 #define WCD934X_RATES_MASK (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
 			    SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
 			    SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000 |\
@@ -2340,10 +2347,9 @@ static int tavil_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		tavil_ocp_control(codec, false);
-		if (tavil->mbhc)
-			blocking_notifier_call_chain(&tavil->mbhc->notifier,
-						     WCD_EVENT_PRE_HPHR_PA_OFF,
-						     &tavil->mbhc->wcd_mbhc);
+		blocking_notifier_call_chain(&tavil->mbhc->notifier,
+					     WCD_EVENT_PRE_HPHR_PA_OFF,
+					     &tavil->mbhc->wcd_mbhc);
 		/* Enable DSD Mute before PA disable */
 		if (dsd_conf &&
 		    (snd_soc_read(codec, WCD934X_CDC_DSD1_PATH_CTL) & 0x01))
@@ -2367,10 +2373,9 @@ static int tavil_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 		else
 			usleep_range(5000, 5100);
 		tavil_codec_override(codec, tavil->hph_mode, event);
-		if (tavil->mbhc)
-			blocking_notifier_call_chain(&tavil->mbhc->notifier,
-					WCD_EVENT_POST_HPHR_PA_OFF,
-					&tavil->mbhc->wcd_mbhc);
+		blocking_notifier_call_chain(&tavil->mbhc->notifier,
+					     WCD_EVENT_POST_HPHR_PA_OFF,
+					     &tavil->mbhc->wcd_mbhc);
 		if (TAVIL_IS_1_0(tavil->wcd9xxx))
 			snd_soc_update_bits(codec, WCD934X_HPH_REFBUFF_LP_CTL,
 					    0x06, 0x0);
@@ -2498,10 +2503,9 @@ static int tavil_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		tavil_ocp_control(codec, false);
-		if (tavil->mbhc)
-			blocking_notifier_call_chain(&tavil->mbhc->notifier,
-						     WCD_EVENT_PRE_HPHL_PA_OFF,
-						     &tavil->mbhc->wcd_mbhc);
+		blocking_notifier_call_chain(&tavil->mbhc->notifier,
+					     WCD_EVENT_PRE_HPHL_PA_OFF,
+					     &tavil->mbhc->wcd_mbhc);
 		/* Enable DSD Mute before PA disable */
 		if (dsd_conf &&
 		    (snd_soc_read(codec, WCD934X_CDC_DSD0_PATH_CTL) & 0x01))
@@ -2527,10 +2531,9 @@ static int tavil_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 		else
 			usleep_range(5000, 5100);
 		tavil_codec_override(codec, tavil->hph_mode, event);
-		if (tavil->mbhc)
-			blocking_notifier_call_chain(&tavil->mbhc->notifier,
-						WCD_EVENT_POST_HPHL_PA_OFF,
-						&tavil->mbhc->wcd_mbhc);
+		blocking_notifier_call_chain(&tavil->mbhc->notifier,
+					     WCD_EVENT_POST_HPHL_PA_OFF,
+					     &tavil->mbhc->wcd_mbhc);
 		if (TAVIL_IS_1_0(tavil->wcd9xxx))
 			snd_soc_update_bits(codec, WCD934X_HPH_REFBUFF_LP_CTL,
 					    0x06, 0x0);
@@ -5232,10 +5235,9 @@ static void tavil_codec_hph_reg_recover(struct tavil_priv *tavil,
 	int i;
 	unsigned int reg;
 
-	if (tavil->mbhc)
-		blocking_notifier_call_chain(&tavil->mbhc->notifier,
-					     WCD_EVENT_OCP_OFF,
-					     &tavil->mbhc->wcd_mbhc);
+	blocking_notifier_call_chain(&tavil->mbhc->notifier,
+				     WCD_EVENT_OCP_OFF,
+				     &tavil->mbhc->wcd_mbhc);
 
 	if (pa_status & 0xC0)
 		goto pa_en_restore;
@@ -5345,13 +5347,11 @@ pa_en_restore:
 	}
 
 end:
-	if (tavil->mbhc) {
-		tavil->mbhc->is_hph_recover = true;
-		blocking_notifier_call_chain(
-				&tavil->mbhc->notifier,
-				WCD_EVENT_OCP_ON,
-				&tavil->mbhc->wcd_mbhc);
-	}
+	tavil->mbhc->is_hph_recover = true;
+	blocking_notifier_call_chain(
+			&tavil->mbhc->notifier,
+			WCD_EVENT_OCP_ON,
+			&tavil->mbhc->wcd_mbhc);
 }
 
 static int tavil_codec_reset_hph_registers(struct snd_soc_dapm_widget *w,
@@ -5394,8 +5394,7 @@ static int tavil_codec_reset_hph_registers(struct snd_soc_dapm_widget *w,
 		} else {
 			dev_dbg(codec->dev, "%s: cache and hw reg are same\n",
 				__func__);
-			if (tavil->mbhc)
-				tavil->mbhc->is_hph_recover = false;
+			tavil->mbhc->is_hph_recover = false;
 		}
 		break;
 	default:
@@ -10101,8 +10100,7 @@ static int tavil_device_down(struct wcd9xxx *wcd9xxx)
 		priv->dai[count].bus_down_in_recovery = true;
 	snd_event_notify(priv->dev->parent, SND_EVENT_DOWN);
 
-	if (priv->mbhc)
-		priv->mbhc->wcd_mbhc.deinit_in_progress = true;
+	priv->mbhc->wcd_mbhc.deinit_in_progress = true;
 	if (delayed_work_pending(&priv->spk_anc_dwork.dwork))
 		cancel_delayed_work(&priv->spk_anc_dwork.dwork);
 	for (decimator = 0; decimator < WCD934X_NUM_DECIMATORS; decimator++) {
@@ -10117,14 +10115,11 @@ static int tavil_device_down(struct wcd9xxx *wcd9xxx)
 	}
 	if (delayed_work_pending(&priv->power_gate_work))
 		cancel_delayed_work_sync(&priv->power_gate_work);
-	if (priv->mbhc) {
-		if (delayed_work_pending(&priv->mbhc->wcd_mbhc.mbhc_btn_dwork)) {
-			ret = cancel_delayed_work(
-					&priv->mbhc->wcd_mbhc.mbhc_btn_dwork);
-			if (ret)
-				priv->mbhc->wcd_mbhc.mbhc_cb->lock_sleep
-						(&priv->mbhc->wcd_mbhc, false);
-		}
+	if (delayed_work_pending(&priv->mbhc->wcd_mbhc.mbhc_btn_dwork)) {
+		ret = cancel_delayed_work(&priv->mbhc->wcd_mbhc.mbhc_btn_dwork);
+		if (ret)
+			priv->mbhc->wcd_mbhc.mbhc_cb->lock_sleep
+					(&priv->mbhc->wcd_mbhc, false);
 	}
 
 	if (priv->swr.ctrl_data) {
@@ -10208,17 +10203,16 @@ static int tavil_post_reset_cb(struct wcd9xxx *wcd9xxx)
 		dev_err(codec->dev, "%s: invalid pdata\n", __func__);
 
 	/* Initialize MBHC module */
-	if (tavil->mbhc) {
-		mbhc = &tavil->mbhc->wcd_mbhc;
-		ret = tavil_mbhc_post_ssr_init(tavil->mbhc, codec);
-		if (ret) {
-			dev_err(codec->dev, "%s: mbhc initialization failed\n",
-				__func__);
-			goto done;
-		} else {
-			tavil_mbhc_hs_detect(codec, mbhc->mbhc_cfg);
-		}
+	mbhc = &tavil->mbhc->wcd_mbhc;
+	ret = tavil_mbhc_post_ssr_init(tavil->mbhc, codec);
+	if (ret) {
+		dev_err(codec->dev, "%s: mbhc initialization failed\n",
+			__func__);
+		goto done;
+	} else {
+		tavil_mbhc_hs_detect(codec, mbhc->mbhc_cfg);
 	}
+
 	/* DSD initialization */
 	ret = tavil_dsd_post_ssr_init(tavil->dsd_config);
 	if (ret)
@@ -10248,6 +10242,200 @@ done:
 	mutex_unlock(&tavil->codec_mutex);
 	return ret;
 }
+
+/* ASUS_BSP Paul +++ */
+#define AUDIO_DEBUG_PROC_FILE "driver/audio_debug"
+#define AUDIO_CODEC_STATUS_PROC_FILE "driver/audio_codec_status"
+
+static struct proc_dir_entry *audio_debug_proc_file;
+static struct proc_dir_entry *audio_codec_status_proc_file;
+static mm_segment_t oldfs;
+
+static void initKernelEnv(void)
+{
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+}
+
+static void deinitKernelEnv(void)
+{
+	set_fs(oldfs);
+}
+
+static ssize_t audio_debug_proc_write(struct file *filp, const char __user *buff, size_t len, loff_t *off)
+{
+	char messages[256];
+	memset(messages, 0, sizeof(messages));
+	printk("[Audio][Debug] audio_debug_proc_write\n");
+
+	if (len > 256)
+		len = 256;
+	if (copy_from_user(messages, buff, len))
+		return -EFAULT;
+
+	initKernelEnv();
+
+	if (strncmp(messages, "1", 1) == 0) {
+		if (!g_tavil_priv->mbhc->wcd_mbhc.debug_mode) {
+			gpio_direction_output(GPIO_AUDIO_DEBUG, 0); /* enable uart log, disable audio */
+			wcd_mbhc_plug_detect_for_debug_mode(&g_tavil_priv->mbhc->wcd_mbhc, true);
+			g_tavil_priv->mbhc->wcd_mbhc.debug_mode = true;
+		}
+		printk("[Audio][Debug] Audio debug mode!!\n");
+	} else if (strncmp(messages, "0", 1) == 0) {
+		if (g_tavil_priv->mbhc->wcd_mbhc.debug_mode) {
+			gpio_direction_output(GPIO_AUDIO_DEBUG, 1); /* disable uart log, enable audio */
+			g_tavil_priv->mbhc->wcd_mbhc.debug_mode = false;
+			wcd_mbhc_plug_detect_for_debug_mode(&g_tavil_priv->mbhc->wcd_mbhc, false);
+		}
+		printk("[Audio][Debug] Audio headset normal mode!!\n");
+	} else if (strncmp(messages, "read", strlen("read")) == 0) {
+		unsigned int reg, val;
+		sscanf(messages + strlen("read") + 1, "%x", &reg);
+		if (regmap_read(g_tavil_priv->wcd9xxx->regmap, reg, &val) == 0)
+			printk("[Audio][codec] read register reg[0x%x]=[0x%x]\n", reg, val);
+		else
+			printk("[Audio][codec] failed to read register reg[0x%x]\n", reg);
+	} else if (strncmp(messages, "write", strlen("write")) == 0) {
+		unsigned int reg, val;
+		sscanf(messages + strlen("write") + 1, "%x %x", &reg, &val);
+		if (regmap_write(g_tavil_priv->wcd9xxx->regmap, reg, val) == 0) {
+			regmap_read(g_tavil_priv->wcd9xxx->regmap, reg, &val);
+			printk("[Audio][codec] write register reg[0x%x]=[0x%x]\n", reg, val);
+		}
+		else
+			printk("[Audio][codec] failed to write register reg[0x%x]\n", reg);
+	} else if (strncmp(messages, "update", strlen("update")) == 0) {
+		unsigned int reg, mask, val;
+		sscanf(messages + strlen("update") + 1, "%x %x %x", &reg, &mask, &val);
+		if (regmap_update_bits(g_tavil_priv->wcd9xxx->regmap, reg, mask, val) == 0) {
+			regmap_read(g_tavil_priv->wcd9xxx->regmap, reg, &val);
+			printk("[Audio][codec] update register reg[0x%x]=[0x%x]\n", reg, val);
+		}
+		else
+			printk("[Audio][codec] failed to update register reg[0x%x]\n", reg);
+	} else if (strncmp(messages, "dump", strlen("dump")) == 0) {
+		unsigned int reg, val;
+		for (reg = 0; reg < g_tavil_priv->wcd9xxx->regmap->max_register; reg++) {
+			if (regmap_read(g_tavil_priv->wcd9xxx->regmap, reg, &val) == 0)
+				printk("[Audio][codec] dump register reg[0x%x]=[0x%x]\n", reg, val);
+		}
+	} else {
+		printk("[Audio][Debug] %s\n", messages);
+	}
+
+	deinitKernelEnv();
+	return len;
+}
+
+static ssize_t audio_debug_proc_read(struct file *filp, char __user *buff, size_t len, loff_t *off)
+{
+	char messages[256];
+
+	if (*off)
+		return 0;
+
+	memset(messages, 0, sizeof(messages));
+	if (len > 256)
+		len = 256;
+
+	if (g_tavil_priv->mbhc->wcd_mbhc.debug_mode)
+		sprintf(messages, "audio debug mode\n");
+	else {
+		switch (g_tavil_priv->mbhc->wcd_mbhc.current_plug) {
+		case MBHC_PLUG_TYPE_HEADSET:
+			sprintf(messages, "1\n");
+			break;
+		case MBHC_PLUG_TYPE_HEADPHONE:
+			sprintf(messages, "2\n");
+			break;
+		case MBHC_PLUG_TYPE_HIGH_HPH:
+			sprintf(messages, "3\n");
+			break;
+		case MBHC_PLUG_TYPE_GND_MIC_SWAP:
+			sprintf(messages, "4\n");
+			break;
+		case MBHC_PLUG_TYPE_ANC_HEADPHONE:
+			sprintf(messages, "5\n");
+			break;
+		default:
+			sprintf(messages, "0\n");
+			break;
+		}
+	}
+
+	if (copy_to_user(buff, messages, len))
+		return -EFAULT;
+
+	(*off)++;
+	return len;
+}
+
+static ssize_t audio_codec_status_proc_read(struct file *filp, char __user *buff, size_t len, loff_t *off)
+{
+	char messages[256];
+	int val;
+
+	if (*off)
+		return 0;
+
+	memset(messages, 0, sizeof(messages));
+	if (len > 256)
+		len = 256;
+
+	val = snd_soc_read(g_tavil_priv->codec, WCD934X_PAGE0_PAGE_REGISTER);
+
+	if (val < 0)
+		sprintf(messages, "0\n");
+	else
+		sprintf(messages, "1\n");
+
+	if (copy_to_user(buff, messages, len))
+		return -EFAULT;
+
+	(*off)++;
+	return len;
+}
+
+static struct file_operations audio_debug_proc_ops = {
+	.write = audio_debug_proc_write,
+	.read = audio_debug_proc_read,
+};
+
+static struct file_operations audio_codec_status_proc_ops = {
+	.read = audio_codec_status_proc_read,
+};
+
+static void create_audio_debug_proc_file(void)
+{
+	printk("[Audio][Debug] create_audio_debug_proc_file\n");
+	audio_debug_proc_file = proc_create(AUDIO_DEBUG_PROC_FILE, 0666, NULL, &audio_debug_proc_ops);
+
+	if (audio_debug_proc_file == NULL)
+		pr_err("[Audio][Debug] create_audio_debug_proc_file failed\n");
+}
+
+static void create_audio_codec_status_proc_file(void)
+{
+	printk("[Audio][Debug] create_audio_codec_status_proc_file\n");
+	audio_codec_status_proc_file = proc_create(AUDIO_CODEC_STATUS_PROC_FILE, 0666, NULL, &audio_codec_status_proc_ops);
+
+	if (audio_codec_status_proc_file == NULL)
+		pr_err("[Audio][Debug] create_audio_codec_status_proc_file failed\n");
+}
+
+static void remove_audio_debug_proc_file(void)
+{
+	printk("[Audio][Debug] remove_audio_debug_proc_file\n");
+	remove_proc_entry(AUDIO_DEBUG_PROC_FILE, NULL);
+}
+
+static void remove_audio_codec_status_proc_file(void)
+{
+	printk("[Audio][Debug] remove_audio_codec_status_proc_file\n");
+	remove_proc_entry(AUDIO_CODEC_STATUS_PROC_FILE, NULL);
+}
+/* ASUS_BSP Paul --- */
 
 static int tavil_soc_codec_probe(struct snd_soc_codec *codec)
 {
@@ -10417,6 +10605,21 @@ static int tavil_soc_codec_probe(struct snd_soc_codec *codec)
 	 */
 	tavil_vote_svs(tavil, false);
 
+	/* ASUS_BSP Paul +++ */
+	g_tavil_priv = tavil;
+
+	ret = gpio_request(GPIO_AUDIO_DEBUG, "AUDIO_DEBUG");
+	if (ret)
+		pr_err("%s: Failed to request gpio AUDIO_DEBUG %d\n", __func__, GPIO_AUDIO_DEBUG);
+	else
+		gpio_direction_output(GPIO_AUDIO_DEBUG, 0);
+
+	g_tavil_priv->mbhc->wcd_mbhc.debug_mode = true;
+
+	create_audio_debug_proc_file();
+	create_audio_codec_status_proc_file();
+	/* ASUS_BSP Paul --- */
+
 	return ret;
 
 err_pdata:
@@ -10450,6 +10653,11 @@ static int tavil_soc_codec_remove(struct snd_soc_codec *codec)
 	/* Deinitialize MBHC module */
 	tavil_mbhc_deinit(codec);
 	tavil->mbhc = NULL;
+
+	/* ASUS_BSP Paul +++ */
+	remove_audio_debug_proc_file();
+	remove_audio_codec_status_proc_file();
+	/* ASUS_BSP Paul --- */
 
 	return 0;
 }

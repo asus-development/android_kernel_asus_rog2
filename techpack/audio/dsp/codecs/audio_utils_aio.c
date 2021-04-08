@@ -175,7 +175,7 @@ static phys_addr_t audio_aio_ion_fixup(struct q6audio_aio *audio, void *addr,
 
 	ret = audio_aio_ion_lookup_vaddr(audio, addr, len, &region);
 	if (ret) {
-		pr_err("%s[%pK]:lookup (%pK, %ld) failed\n",
+		pr_debug("%s[%pK]:lookup (%pK, %ld) failed\n",
 				__func__, audio, addr, len);
 		return 0;
 	}

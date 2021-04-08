@@ -33,6 +33,13 @@
 #include "wcd-mbhc-legacy.h"
 #include "wcd-mbhc-adc.h"
 #include "wcd-mbhc-v2-api.h"
+#include <linux/wakelock.h> //Austin+++
+
+/* ASUS_BSP Paul +++ */
+static bool jack_det_invert = false;
+static bool g_first_call = true;
+static struct wake_lock     g_hs_btn_wake_lock;
+/* ASUS_BSP Paul --- */
 
 void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
 			  struct snd_soc_jack *jack, int status, int mask)
@@ -659,6 +666,7 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 						SND_JACK_LINEOUT |
 						SND_JACK_ANC_HEADPHONE |
 						SND_JACK_UNSUPPORTED);
+			mbhc->force_linein = false;
 		}
 
 		if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET &&
@@ -695,6 +703,8 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 					&mbhc->zl, &mbhc->zr);
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN,
 						 fsm_en);
+//Bruno++ Disable 3 pole extension cable
+#if 0
 			if ((mbhc->zl > mbhc->mbhc_cfg->linein_th &&
 				mbhc->zl < MAX_IMPED) &&
 				(mbhc->zr > mbhc->mbhc_cfg->linein_th &&
@@ -715,25 +725,8 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				pr_debug("%s: Marking jack type as SND_JACK_LINEOUT\n",
 				__func__);
 			}
-		}
-
-		/* Do not calculate impedance again for lineout
-		 * as during playback pa is on and impedance values
-		 * will not be correct resulting in lineout detected
-		 * as headphone.
-		 */
-		if ((is_pa_on) && mbhc->force_linein == true) {
-			jack_type = SND_JACK_LINEOUT;
-			mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
-			if (mbhc->hph_status) {
-				mbhc->hph_status &= ~(SND_JACK_HEADSET |
-						SND_JACK_LINEOUT |
-						SND_JACK_UNSUPPORTED);
-				wcd_mbhc_jack_report(mbhc,
-						&mbhc->headset_jack,
-						mbhc->hph_status,
-						WCD_MBHC_JACK_MASK);
-			}
+#endif
+//Bruno++ Disable 3 pole extension cable
 		}
 
 		mbhc->hph_status |= jack_type;
@@ -927,6 +920,11 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 	else
 		pr_info("%s: hs_detect_plug work not cancelled\n", __func__);
 
+	/* ASUS_BSP Paul +++ */
+	if (mbhc->debug_mode)
+		goto done;
+	/* ASUS_BSP Paul --- */
+
 	if (mbhc->mbhc_cb->micbias_enable_status)
 		micbias1 = mbhc->mbhc_cb->micbias_enable_status(mbhc,
 						MIC_BIAS_1);
@@ -1059,10 +1057,6 @@ static irqreturn_t wcd_mbhc_mech_plug_detect_irq(int irq, void *data)
 	struct wcd_mbhc *mbhc = data;
 
 	pr_debug("%s: enter\n", __func__);
-	if (mbhc == NULL) {
-		pr_err("%s: NULL irq data\n", __func__);
-		return IRQ_NONE;
-	}
 	if (unlikely((mbhc->mbhc_cb->lock_sleep(mbhc, true)) == false)) {
 		pr_warn("%s: failed to hold suspend\n", __func__);
 		r = IRQ_NONE;
@@ -1074,6 +1068,54 @@ static irqreturn_t wcd_mbhc_mech_plug_detect_irq(int irq, void *data)
 	pr_debug("%s: leave %d\n", __func__, r);
 	return r;
 }
+
+/* ASUS_BSP Paul +++ */
+void wcd_mbhc_plug_detect_for_debug_mode(struct wcd_mbhc *mbhc, bool debug_mode)
+{
+	if (debug_mode) {
+		if (mbhc->current_plug != MBHC_PLUG_TYPE_NONE) {
+			printk("%s: current_plug != MBHC_PLUG_TYPE_NONE, force removal\n", __func__);
+			mbhc->mbhc_cb->lock_sleep(mbhc, true);
+			wcd_mbhc_swch_irq_handler(mbhc);
+			mbhc->mbhc_cb->lock_sleep(mbhc, false);
+			jack_det_invert = true;
+		}
+		mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->mbhc_btn_press_intr, false);
+		mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->mbhc_btn_release_intr, false);
+		mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->hph_left_ocp, false);
+		mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->hph_right_ocp, false);
+	} else {
+		bool detection_type;
+		if (!g_first_call) {
+			mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->mbhc_btn_press_intr, true);
+			mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->mbhc_btn_release_intr, true);
+			mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->hph_left_ocp, true);
+			mbhc->mbhc_cb->irq_control(mbhc->codec, mbhc->intr_ids->hph_right_ocp, true);
+		}
+		g_first_call = false;
+		WCD_MBHC_REG_READ(WCD_MBHC_MECH_DETECTION_TYPE, detection_type);
+		if (!jack_det_invert && !detection_type) {
+			printk("%s: jack_det_invert == false, detect plug type\n", __func__);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MECH_DETECTION_TYPE,
+					!detection_type);
+			mbhc->mbhc_cb->lock_sleep(mbhc, true);
+			wcd_mbhc_swch_irq_handler(mbhc);
+			mbhc->mbhc_cb->lock_sleep(mbhc, false);
+		} else if (jack_det_invert && !detection_type) {
+			printk("%s: current_plug == MBHC_PLUG_TYPE_NONE\n", __func__);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MECH_DETECTION_TYPE,
+					!detection_type);
+		} else if (jack_det_invert && detection_type) {
+			printk("%s: jack_det_invert == true, detect plug type\n", __func__);
+			mbhc->mbhc_cb->lock_sleep(mbhc, true);
+			wcd_mbhc_swch_irq_handler(mbhc);
+			mbhc->mbhc_cb->lock_sleep(mbhc, false);
+		}
+		jack_det_invert = false;
+	}
+}
+EXPORT_SYMBOL(wcd_mbhc_plug_detect_for_debug_mode);
+/* ASUS_BSP Paul --- */
 
 int wcd_mbhc_get_button_mask(struct wcd_mbhc *mbhc)
 {
@@ -1250,12 +1292,13 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 				pr_debug("%s: Switch irq kicked in, ignore\n",
 					__func__);
 			} else {
-				pr_debug("%s: Reporting btn press\n",
+				printk("%s: Reporting btn press\n",
 					 __func__);
 				wcd_mbhc_jack_report(mbhc,
 						     &mbhc->button_jack,
 						     mbhc->buttons_pressed,
 						     mbhc->buttons_pressed);
+				wake_lock_timeout(&g_hs_btn_wake_lock, msecs_to_jiffies(3000));//Austin+++
 				pr_debug("%s: Reporting btn release\n",
 					 __func__);
 				wcd_mbhc_jack_report(mbhc,
@@ -1407,8 +1450,8 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 		/* Insertion debounce set to 48ms */
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_INSREM_DBNC, 4);
 	} else {
-		/* Insertion debounce set to 96ms */
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_INSREM_DBNC, 6);
+		/* Insertion debounce set to 512ms */
+		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_INSREM_DBNC, 0xB); /* ASUS_BSP Paul +++ */
 	}
 
 	/* Button Debounce set to 16ms */
@@ -1958,6 +2001,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 	}
 
 	mbhc->deinit_in_progress = false;
+	wake_lock_init(&g_hs_btn_wake_lock, WAKE_LOCK_SUSPEND, "hs_btn_wake_lock"); //Austin+++
 	pr_debug("%s: leave ret %d\n", __func__, ret);
 	return ret;
 
@@ -2009,6 +2053,7 @@ void wcd_mbhc_deinit(struct wcd_mbhc *mbhc)
 	mutex_destroy(&mbhc->codec_resource_lock);
 	mutex_destroy(&mbhc->hphl_pa_lock);
 	mutex_destroy(&mbhc->hphr_pa_lock);
+	wake_lock_destroy(&g_hs_btn_wake_lock);//Austin+++
 }
 EXPORT_SYMBOL(wcd_mbhc_deinit);
 

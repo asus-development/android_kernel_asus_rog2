@@ -11337,6 +11337,12 @@ static const struct snd_kcontrol_new mmul17_mixer_controls[] = {
 	MSM_BACKEND_DAI_SLIMBUS_1_TX,
 	MSM_FRONTEND_DAI_MULTIMEDIA17, 1, 0, msm_routing_get_audio_mixer,
 	msm_routing_put_audio_mixer),
+	//Austin+++
+	SOC_DOUBLE_EXT("SLIM_7_TX", SND_SOC_NOPM,
+	MSM_BACKEND_DAI_SLIMBUS_7_TX,
+	MSM_FRONTEND_DAI_MULTIMEDIA17, 1, 0, msm_routing_get_audio_mixer,
+	msm_routing_put_audio_mixer),
+	//Austin---
 	SOC_DOUBLE_EXT("PRI_MI2S_TX", SND_SOC_NOPM,
 	MSM_BACKEND_DAI_PRI_MI2S_TX,
 	MSM_FRONTEND_DAI_MULTIMEDIA17, 1, 0, msm_routing_get_audio_mixer,
@@ -11371,6 +11377,10 @@ static const struct snd_kcontrol_new mmul17_mixer_controls[] = {
 	msm_routing_put_audio_mixer),
 	SOC_DOUBLE_EXT("QUAT_MI2S_TX", SND_SOC_NOPM,
 	MSM_BACKEND_DAI_QUATERNARY_MI2S_TX,
+	MSM_FRONTEND_DAI_MULTIMEDIA17, 1, 0, msm_routing_get_audio_mixer,
+	msm_routing_put_audio_mixer),
+	SOC_DOUBLE_EXT("USB_AUDIO_TX", SND_SOC_NOPM,
+	MSM_BACKEND_DAI_USB_TX,
 	MSM_FRONTEND_DAI_MULTIMEDIA17, 1, 0, msm_routing_get_audio_mixer,
 	msm_routing_put_audio_mixer),
 	SOC_DOUBLE_EXT("WSA_CDC_DMA_TX_0", SND_SOC_NOPM,
@@ -17354,16 +17364,17 @@ static int msm_routing_put_lsm_app_type_cfg_control(
 	int shift = ((struct soc_multi_mixer_control *)
 				kcontrol->private_value)->shift;
 	int i = 0, j;
-	int num_app_types = ucontrol->value.integer.value[i++];
+	int num_app_types;
 
-	memset(lsm_app_type_cfg, 0, MAX_APP_TYPES*
-	       sizeof(struct msm_pcm_routing_app_type_data));
-
-	if (num_app_types > MAX_APP_TYPES) {
+	if (ucontrol->value.integer.value[0] > MAX_APP_TYPES) {
 		pr_err("%s: number of app types exceed the max supported\n",
 			__func__);
 		return -EINVAL;
 	}
+
+	num_app_types = ucontrol->value.integer.value[i++];
+	memset(lsm_app_type_cfg, 0, MAX_APP_TYPES*
+	       sizeof(struct msm_pcm_routing_app_type_data));
 
 	for (j = 0; j < num_app_types; j++) {
 		lsm_app_type_cfg[j].app_type =
@@ -18080,6 +18091,11 @@ static const char * const mi2s_rx_vi_fb_tx_mux_text[] = {
 	"ZERO", "SENARY_TX"
 };
 
+/* NXP amp */
+static const char * const mi2s_rx_vi_fb_tx_mux_text_for_quat[] = {
+	"ZERO", "QUAT_MI2S_TX"
+};
+
 static const char * const int4_mi2s_rx_vi_fb_tx_mono_mux_text[] = {
 	"ZERO", "INT5_MI2S_TX"
 };
@@ -18107,6 +18123,11 @@ static const int wsa_rx_0_vi_fb_tx_rch_value[] = {
 
 static const int mi2s_rx_vi_fb_tx_value[] = {
 	MSM_BACKEND_DAI_MAX, MSM_BACKEND_DAI_SENARY_MI2S_TX
+};
+
+/* NXP amp */
+static const int mi2s_rx_vi_fb_tx_value_for_quat[] = {
+	MSM_BACKEND_DAI_MAX, MSM_BACKEND_DAI_QUATERNARY_MI2S_TX
 };
 
 static const int int4_mi2s_rx_vi_fb_tx_mono_ch_value[] = {
@@ -18141,6 +18162,12 @@ static const struct soc_enum mi2s_rx_vi_fb_mux_enum =
 	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_PRI_MI2S_RX, 0, 0,
 	ARRAY_SIZE(mi2s_rx_vi_fb_tx_mux_text),
 	mi2s_rx_vi_fb_tx_mux_text, mi2s_rx_vi_fb_tx_value);
+
+/* NXP amp */
+static const struct soc_enum mi2s_rx_vi_fb_mux_enum_for_quat =
+	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_QUATERNARY_MI2S_RX, 0, 0,
+	ARRAY_SIZE(mi2s_rx_vi_fb_tx_mux_text_for_quat),
+	mi2s_rx_vi_fb_tx_mux_text_for_quat, mi2s_rx_vi_fb_tx_value_for_quat);
 
 static const struct soc_enum int4_mi2s_rx_vi_fb_mono_ch_mux_enum =
 	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_INT4_MI2S_RX, 0, 0,
@@ -18177,6 +18204,12 @@ static const struct snd_kcontrol_new wsa_rx_0_vi_fb_rch_mux =
 static const struct snd_kcontrol_new mi2s_rx_vi_fb_mux =
 	SOC_DAPM_ENUM_EXT("PRI_MI2S_RX_VI_FB_MUX",
 	mi2s_rx_vi_fb_mux_enum, spkr_prot_get_vi_lch_port,
+	spkr_prot_put_vi_lch_port);
+
+/* NXP amp */
+static const struct snd_kcontrol_new mi2s_rx_vi_fb_mux_for_quat =
+	SOC_DAPM_ENUM_EXT("QUAT_MI2S_RX_VI_FB_MUX",
+	mi2s_rx_vi_fb_mux_enum_for_quat, spkr_prot_get_vi_lch_port,
 	spkr_prot_put_vi_lch_port);
 
 static const struct snd_kcontrol_new int4_mi2s_rx_vi_fb_mono_ch_mux =
@@ -19541,6 +19574,8 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 				&wsa_rx_0_vi_fb_rch_mux),
 	SND_SOC_DAPM_MUX("PRI_MI2S_RX_VI_FB_MUX", SND_SOC_NOPM, 0, 0,
 				&mi2s_rx_vi_fb_mux),
+	SND_SOC_DAPM_MUX("QUAT_MI2S_RX_VI_FB_MUX", SND_SOC_NOPM, 0, 0,
+				&mi2s_rx_vi_fb_mux_for_quat), /* NXP amp */
 	SND_SOC_DAPM_MUX("INT4_MI2S_RX_VI_FB_MONO_CH_MUX", SND_SOC_NOPM, 0, 0,
 				&int4_mi2s_rx_vi_fb_mono_ch_mux),
 	SND_SOC_DAPM_MUX("INT4_MI2S_RX_VI_FB_STEREO_CH_MUX", SND_SOC_NOPM, 0, 0,
@@ -20072,6 +20107,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MultiMedia4 Mixer", "SLIM_1_TX", "SLIMBUS_1_TX"},
 	{"MultiMedia17 Mixer", "SLIM_0_TX", "SLIMBUS_0_TX"},
 	{"MultiMedia17 Mixer", "SLIM_1_TX", "SLIMBUS_1_TX"},
+	{"MultiMedia17 Mixer", "SLIM_7_TX", "SLIMBUS_7_TX"}, //Austin+++
 	{"MultiMedia18 Mixer", "SLIM_0_TX", "SLIMBUS_0_TX"},
 	{"MultiMedia18 Mixer", "SLIM_1_TX", "SLIMBUS_1_TX"},
 	{"MultiMedia19 Mixer", "SLIM_0_TX", "SLIMBUS_0_TX"},
@@ -21223,6 +21259,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MultiMedia6 Mixer", "USB_AUDIO_TX", "USB_AUDIO_TX"},
 	{"MultiMedia8 Mixer", "USB_AUDIO_TX", "USB_AUDIO_TX"},
 	{"MultiMedia10 Mixer", "USB_AUDIO_TX", "USB_AUDIO_TX"},
+	{"MultiMedia17 Mixer", "USB_AUDIO_TX", "USB_AUDIO_TX"},
 
 	{"MultiMedia16 Mixer", "PRI_TDM_TX_0", "PRI_TDM_TX_0"},
 	{"MultiMedia16 Mixer", "PRI_TDM_TX_1", "PRI_TDM_TX_1"},
@@ -22061,7 +22098,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"TERT_MI2S_RX_DL_HL", "Switch", "TERT_MI2S_DL_HL"},
 	{"TERT_MI2S_RX", NULL, "TERT_MI2S_RX_DL_HL"},
 
-	{"QUAT_MI2S_RX_DL_HL", "Switch", "QUAT_MI2S_DL_HL"},
+	{"QUAT_MI2S_RX_DL_HL", "Switch", "SLIM0_DL_HL"}, /* NXP amp */
 	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_RX_DL_HL"},
 	{"QUIN_MI2S_RX_DL_HL", "Switch", "QUIN_MI2S_DL_HL"},
 	{"QUIN_MI2S_RX", NULL, "QUIN_MI2S_RX_DL_HL"},
@@ -22947,6 +22984,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"WSA_RX_0_VI_FB_LCH_MUX", "WSA_CDC_DMA_TX_0", "WSA_CDC_DMA_TX_0"},
 	{"WSA_RX_0_VI_FB_RCH_MUX", "WSA_CDC_DMA_TX_0", "WSA_CDC_DMA_TX_0"},
 	{"PRI_MI2S_RX_VI_FB_MUX", "SENARY_TX", "SENARY_TX"},
+	{"QUAT_MI2S_RX_VI_FB_MUX", "QUAT_MI2S_TX", "QUAT_MI2S_TX"}, /* NXP amp */
 	{"INT4_MI2S_RX_VI_FB_MONO_CH_MUX", "INT5_MI2S_TX", "INT5_MI2S_TX"},
 	{"INT4_MI2S_RX_VI_FB_STEREO_CH_MUX", "INT5_MI2S_TX", "INT5_MI2S_TX"},
 	{"SLIMBUS_0_RX", NULL, "SLIM0_RX_VI_FB_LCH_MUX"},
@@ -22954,6 +22992,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"WSA_CDC_DMA_RX_0", NULL, "WSA_RX_0_VI_FB_LCH_MUX"},
 	{"WSA_CDC_DMA_RX_0", NULL, "WSA_RX_0_VI_FB_RCH_MUX"},
 	{"PRI_MI2S_RX", NULL, "PRI_MI2S_RX_VI_FB_MUX"},
+	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_RX_VI_FB_MUX"}, /* NXP amp */
 	{"INT4_MI2S_RX", NULL, "INT4_MI2S_RX_VI_FB_MONO_CH_MUX"},
 	{"INT4_MI2S_RX", NULL, "INT4_MI2S_RX_VI_FB_STEREO_CH_MUX"},
 	{"PRI_TDM_TX_0", NULL, "BE_IN"},

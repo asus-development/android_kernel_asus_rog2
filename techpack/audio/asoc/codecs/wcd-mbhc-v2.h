@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -148,7 +148,10 @@ do {                                                    \
 #define FW_READ_ATTEMPTS 15
 #define FW_READ_TIMEOUT 4000000
 #define FAKE_REM_RETRY_ATTEMPTS 3
-#define MAX_IMPED 60000
+//Bruno++ Support 3 pole extension cable
+//#define MAX_IMPED 60000
+#define MAX_IMPED 20000
+//Bruno++ Support 3 pole extension cable
 
 #define WCD_MBHC_BTN_PRESS_COMPL_TIMEOUT_MS  50
 #define ANC_DETECT_RETRY_CNT 7
@@ -537,7 +540,6 @@ struct wcd_mbhc {
 	bool gnd_swh; /*track GND switch NC / NO */
 	u32 hs_thr;
 	u32 hph_thr;
-	u32 micb_mv;
 	u32 swap_thr;
 	u32 moist_vref;
 	u32 moist_iref;
@@ -600,6 +602,8 @@ struct wcd_mbhc {
 	bool force_linein;
 	struct device_node *fsa_np;
 	struct notifier_block fsa_nb;
+
+	bool debug_mode; /* ASUS_BSP Paul +++ */
 };
 
 void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
@@ -615,5 +619,7 @@ int wcd_cancel_btn_work(struct wcd_mbhc *mbhc);
 int wcd_mbhc_get_button_mask(struct wcd_mbhc *mbhc);
 void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			enum snd_jack_types jack_type);
+
+void wcd_mbhc_plug_detect_for_debug_mode(struct wcd_mbhc *mbhc, bool debug_mode); /* ASUS_BSP Paul +++ */
 
 #endif /* __WCD_MBHC_V2_H__ */
